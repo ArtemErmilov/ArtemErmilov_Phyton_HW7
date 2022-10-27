@@ -3,69 +3,210 @@ import Loger as log
 import breaking_data as bd
 import Rational_math as rm
 import Complex_math as cm
-from os import system
+import Controller as con
+
+import logging
+
+
+
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, Bot 
+from telegram.ext import (
+    Updater,
+    CommandHandler,
+    MessageHandler,
+    Filters,
+    ConversationHandler,
+    Handler
+)
+
+                        # Включим ведение журнала
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+
+NUMBER, RATI, COMP, REPEAT_OR_END_CALC = range(4)
+
+def repeat_or_end_calc_menu (update):
+    reply_keyboard = [['Выход', 'Продолжить']]
+    
+    markup_key = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
+    
+    update.message.reply_text(
+        'Продолжить работу калькулятора, или выйти?',
+        reply_markup=markup_key,)
+
+def start(update, _):
+    user = update.message.from_user
+    logger.info("Старт бот-калькулятор. Пользователь %s %s", user.first_name, user.last_name)
+    log.log_data(f"Старт бот-калькулятор. Пользователь {user.first_name} {user.last_name} ")
+
+    reply_keyboard = [['Рациональные', 'Комплексные']]
+    
+    markup_key = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
+    
+    update.message.reply_text(
+        f'Приветствую тебя {user.first_name} {user.last_name}\n'
+        'Я Бот-калькулятор.\n'
+        'Выбери, с какими числами будешь работать.\n'
+        'Для выход из калькулятора введите /cancel  ',
+        reply_markup=markup_key,)
+    return NUMBER
+
+def number(update, _):
+    
+    user = update.message.from_user
+    
+    logger.info("%s выбрал %s", user.first_name, update.message.text)
+    log.log_data(f"{user.first_name} выбрал {update.message.text}")
+                                            
+    text=  update.message.text
+    if text == 'Рациональные':
+        update.message.reply_text(
+            'Вы выбрали рациональные числа. \n' 
+            'Введите математическое выражение в виде: -3+5*(2+3^2)-5.\n'
+            'Можно использовать операторы "+","-","*","/","^".\n'
+            'Для завершения введите /cancel',
+
+            reply_markup=ReplyKeyboardRemove(), # Следующее сообщение с удалением клавиатуры `ReplyKeyboardRemove`
+        )
+        return RATI
+    else:
+        update.message.reply_text(
+            'Вы выбрали комплексные числа. \n' 
+            'Введите математическое выражение в виде: (5+2i)+(3+4i)\n'
+            'Можно использовать операторы "+","-","*","/".\n'
+            'Для завершения введи /cancel',
+
+            reply_markup=ReplyKeyboardRemove(),
+        )
+        return COMP
+
+def rac(update, _):
+    user = update.message.from_user
+     
+    math_f = update.message.text
+    
+    logger.info("%s ввёл: %s", user.first_name, update.message.text)
+    log.log_data(f"{user.first_name} ввёл: {update.message.text}")
+    
+    bool_error, text_error , number = rm.math_rational_namber(math_f)
+
+    if bool_error == False:
+        logger.info("Решение: %s = %s", update.message.text, number)
+        log.log_data(f"Решение: {update.message.text} = {number}")
+
+        update.message.reply_text(
+            f'Решение: {math_f}={number}')
+        
+    else:
+        logger.info("Ошибка: %s ", text_error)
+        log.log_data(f"Ошибка: {text_error} ")
+        update.message.reply_text(text_error)
+ 
+    repeat_or_end_calc_menu(update)
+
+    return REPEAT_OR_END_CALC
+    
+
+def komp(update, _):
+
+    user = update.message.from_user
+    math_f = update.message.text
+    
+    
+    logger.info("Пользователь %s ввёл: %s", user.first_name, update.message.text)
+    log.log_data(f"{user.first_name} ввёл: {update.message.text}")
+    
+    
+    bool_error, text_error , number = cm.math_compleks_namber(math_f)
+
+    if bool_error==False:
+
+        logger.info("Решение: %s = %s", update.message.text, number)
+        log.log_data(f"Решение: {update.message.text} = {number}")
+
+        update.message.reply_text(
+            f'Решение: {math_f}={number}')
+        
+    else:
+        logger.info("Ошибка: %s ", text_error)
+        update.message.reply_text(text_error) 
+        log.log_data(f"Ошибка: {text_error} ")    
+   
+    repeat_or_end_calc_menu(update)
+
+    return REPEAT_OR_END_CALC
+    
 
 
 
 
+def cancel(update, _): # Обрабатываем команду /cancel если пользователь отменил разговор
+    
+    user = update.message.from_user
+   
+    logger.info("%s вышел из калькулятора.", user.first_name)
+    log.log_data(f"{user.first_name} вышел из калькулятора." )
+    
+    update.message.reply_text(
+        'Вы вышли из калькулятора.\n'
+        f'До скорых встреч {user.first_name}! ', 
+        reply_markup=ReplyKeyboardRemove()
+    )
+   
+    return ConversationHandler.END
 
-def start_calc():
-    log.log_data('Старт программы "Калькулятор"')
-    new_start=True
-    while True:
-        if new_start==True:
-            text_start="Необходимо выбрать с какими числами будете работать: \n1 - Работа с рациональными числами;\n2 - Работа с комплексными числами.\nВвод любого символа кроме 1 и 2 + Enter или Enter закончит программу калькулятора.\n=> "
-            working_mode=ui.input_data(text_start)
-        else:
-            text_restart='Для продолжения работы нажмите Enter.\nДля выхода из Калькулятора введите любой символ и нажмите Enter.\n=> '
-            working_mode=ui.input_data(text_restart)
-            if working_mode=='':
-                log.log_data('Пользователь выбрал продолжение работы программы "Калькулятор"')
-                new_start=True
-                system ('cls')
-                continue
-            else:
-                text_end='Программа "Kалькулятор" закончила работу\n '
-                log.log_data(text_end)
-                ui.output_data(text_end)
-                break
 
-        if working_mode=='1': # Работа с рациональными числами
-            log.log_data('Работа с рациональными числами')# Логирование начала работы
+def repeat_or_end_calc(update, context):
+    user = update.message.from_user
+    repeat_or_end = update.message.text
+    
+    if repeat_or_end=='Продолжить':
 
-            text_rac='Введите математическое выражение с рациональными числами в виде -3+2*(2^3/7). \nДля математических операций используйте операторы  "-", "+","*", "/", "^"\n=> '
-            rac_mac=ui.input_data(text_rac)# Введённое выражение
-            log.log_data(f'Пользователь ввёл=> {rac_mac}')# Логирование
-            
-            
-            bool_error,text_error, rac_number = rm.math_rational_namber(rac_mac)# решение
+        logger.info("%s решил продолжить работу калькулятора",user.first_name)
+        log.log_data(f"{user.first_name} решил продолжить работу калькулятора")
 
-            if bool_error==False:
-                ui.output_data(f'{rac_mac} = {rac_number}')
-                log.log_data(f'Решение: {rac_mac} = {rac_number}')# Логирование ответ
-            else:            
-                ui.output_data(text_error)
-                log.log_data('Ошибка. ' + text_error)# Логирование ошибки
-            new_start=False
+        update.message.reply_text(
+            f'{user.first_name}, вы решили продолжить работу калькулятора.',
+            reply_markup=ReplyKeyboardRemove())
 
-        elif working_mode=='2': # Работа с комплексными числами
-            log.log_data('Работа с комплексными числами')
+        reply_keyboard = [['Рациональные', 'Комплексные']]
+    
+        markup_key = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
+        
+        update.message.reply_text(
+            'Выберите, с какими числами будете работать.'
+            'Для выход из калькулятора введите /cancel  ',
+            reply_markup=markup_key,)
+        return NUMBER
+       
+    elif repeat_or_end=='Выход':
+                
+        logger.info("%s вышел из калькулятора.", user.first_name)
+        log.log_data(f"{user.first_name} вышел из калькулятора.")
+    
+        update.message.reply_text(
+            'Вы вышли из калькулятора.\n'
+            f'До скорых встреч {user.first_name}! ', 
+            reply_markup=ReplyKeyboardRemove())
+        return ConversationHandler.END
 
-            text_komp='Введите выражения с комплексными числами в виде ((5+5i)+(2+3i))*(0+5i)\nДля математических операций используйте операторы  "-", "+","*", "/"\n=> '
-            kompl_mac=ui.input_data(text_komp)
-            log.log_data(f'Пользователь ввёл=> {kompl_mac}')
 
-            bool_error,text_error, com_number = cm.math_compleks_namber(kompl_mac)
 
-            if bool_error==False:
-                ui.output_data(f'{kompl_mac} = {com_number}')
-                log.log_data(f'Решение: {kompl_mac} = {com_number}')
-            else:
-                ui.output_data(text_error)
-                log.log_data('Ошибка. ' + text_error)# Логирование ошибки
-            new_start=False
-        else:
-            text_end='Программа "Kалькулятор" закончила работу\n '
-            log.log_data(text_end)
-            ui.output_data(text_end)
-            break
+def unknown (update, context):# 
+    user = update.message.from_user
+    text=update.message.text
+    context.bot.send_message(update.effective_chat.id, f"{text} Странная команда, я такой не знаю!")
+    logger.info(" %s ввёл %s. Данной команды не существует.",user.first_name,text)
+    log.log_data(f"{user.first_name} ввёл {text}. Данной команды не существует.")
+
+
+def give_word (update, context):
+    word = update.message.text
+    user = update.message.from_user
+    logger.info(" %s ввёл %s.",user.first_name,word)
+    log.log_data(f"{user.first_name} ввёл {word}.")
+    
+    context.bot.send_message(update.effective_chat.id, f"{user.first_name} я тебя не могу понять!")
